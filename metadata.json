@@ -1,0 +1,7 @@
+{
+  "name": "ESGenie",
+  "description": "Expert AI agent for Malaysian SME ESG compliance intelligence. Extract data from utility bills and generate Bursa Malaysia-aligned ESG reports.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
