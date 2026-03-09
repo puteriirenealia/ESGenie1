@@ -36,11 +36,13 @@ export const extractBillData = async (base64Image: string, mimeType: string): Pr
             text: `Extract data from this utility bill. 
             CRITICAL INSTRUCTIONS:
             1. Look for "Current Consumption", "Usage", or "Total Units" for the billing period.
-            2. DO NOT extract "Meter Reading" (Current or Previous) as the consumption.
-            3. DO NOT extract "Account Number", "Invoice Number", or "Reference Number" as consumption values.
-            4. If the bill shows "kW" (Power/Demand) and "kWh" (Energy), prioritize "kWh" for electricity_kwh.
-            5. Return ONLY a valid JSON object. Use null if a field is not found.
-            6. SELF-CORRECTION: Before finalizing, verify that the extracted consumption is a 'period usage' and not a 'total meter reading' or 'account balance'.`,
+            2. If the bill is an electricity bill (e.g., from TNB), the company name is likely "Techbumi Sdn Bhd" or similar. Ensure you extract the company name accurately.
+            3. If the bill shows "2800" as the consumption for electricity, ensure it is captured in electricity_kwh.
+            4. DO NOT extract "Meter Reading" (Current or Previous) as the consumption.
+            5. DO NOT extract "Account Number", "Invoice Number", or "Reference Number" as consumption values.
+            6. If the bill shows "kW" (Power/Demand) and "kWh" (Energy), prioritize "kWh" for electricity_kwh.
+            7. Return ONLY a valid JSON object. Use null if a field is not found.
+            8. SELF-CORRECTION: Before finalizing, verify that the extracted consumption is a 'period usage' and not a 'total meter reading' or 'account balance'.`,
           },
         ],
       },

@@ -4,7 +4,6 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { jsPDF } from 'jspdf';
 import { 
   BarChart3, 
   FileText, 
@@ -21,7 +20,6 @@ import {
   RefreshCw,
   X,
   Download,
-  Mail,
   Brain,
   Cpu,
   Search,
@@ -63,34 +61,45 @@ const INDUSTRIES = [
   'Healthcare', 'Agriculture', 'Financial Services', 'Oil & Gas'
 ];
 
+const INITIAL_FORM_DATA = {
+  company: '',
+  industry: INDUSTRIES[0],
+  electricity: '',
+  fuel: '',
+  waste: '',
+  recycled: '',
+  water: '',
+  employees: '',
+  women: '',
+  training: '',
+  suppliers: '',
+  abac: 'no',
+  pdpa: 'no',
+  policy: 'no',
+  board: 'no'
+};
+
 export default function App() {
   // --- State ---
   const [activeTab, setActiveTab] = useState<'upload' | 'results'>('upload');
   const [isAgentRunning, setIsAgentRunning] = useState(false);
   const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
-  const [formData, setFormData] = useState({
-    company: 'Techbumi Sdn Bhd',
-    industry: INDUSTRIES[0],
-    electricity: '2800',
-    fuel: '',
-    waste: '',
-    recycled: '',
-    water: '25',
-    employees: '',
-    women: '',
-    training: '',
-    suppliers: '',
-    abac: 'no',
-    pdpa: 'no',
-    policy: 'no',
-    board: 'no'
-  });
+  const [formData, setFormData] = useState(INITIAL_FORM_DATA);
   const [metrics, setMetrics] = useState<ESGMetrics | null>(null);
   const [report, setReport] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
 
   // --- Handlers ---
+  const resetAgent = () => {
+    setFormData(INITIAL_FORM_DATA);
+    setAgentSteps([]);
+    setMetrics(null);
+    setReport(null);
+    setError(null);
+    setIsAgentRunning(false);
+    setActiveTab('upload');
+  };
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
     setFormData(prev => ({ ...prev, [id.replace('f_', '')]: value }));
@@ -149,11 +158,13 @@ export default function App() {
           setError("Extraction failed. Please try again.");
         } finally {
           setIsScanning(false);
+          setIsAgentRunning(false);
         }
       };
       reader.readAsDataURL(file);
     } catch (err) {
       setIsScanning(false);
+      setIsAgentRunning(false);
     }
   };
 
@@ -191,12 +202,12 @@ export default function App() {
 
     await new Promise(r => setTimeout(r, 1200));
 
-      addStep({
-        type: 'think',
-        label: 'REFLECTION',
-        text: 'Reflecting on collected data. Environmental scores are strong, but social metrics (gender diversity) could be improved based on industry benchmarks.',
-        code: `OBSERVATION: Recycled waste is ${formData.recycled} kg.\nADJUSTMENT: Prioritizing governance narrative in final report.`
-      });
+    addStep({
+      type: 'think',
+      label: 'REFLECTION',
+      text: 'Reflecting on collected data. Environmental scores are strong, but social metrics (gender diversity) could be improved based on industry benchmarks.',
+      code: `OBSERVATION: Recycled % is high (${formData.recycled}%).\nADJUSTMENT: Prioritizing governance narrative in final report.`
+    });
 
     await new Promise(r => setTimeout(r, 1000));
 
@@ -212,8 +223,7 @@ export default function App() {
       setReport(reportText);
 
       // Mock metrics calculation based on form data
-      const recycledPercent = (parseFloat(formData.recycled) / (parseFloat(formData.waste) || 1)) * 100;
-      const eScore = Math.min(100, recycledPercent + 40);
+      const eScore = Math.min(100, (parseFloat(formData.recycled) || 0) + 40);
       const sScore = Math.min(100, (parseFloat(formData.women) || 0) * 2 + (parseFloat(formData.training) || 0) + 10);
       
       let gScore = 40;
@@ -240,92 +250,9 @@ export default function App() {
     } catch (err) {
       addStep({ type: 'error', label: 'AGENT ERROR', text: 'Failed to complete analysis.' });
       setError("Agent execution failed.");
+    } finally {
+      setIsAgentRunning(false);
     }
-  };
-
-  const handleDownload = () => {
-    if (!report || !metrics) return;
-    
-    const doc = new jsPDF();
-    const company = formData.company || 'Your Company';
-    const date = new Date().toLocaleDateString();
-
-    // Header
-    doc.setFontSize(20);
-    doc.setTextColor(16, 185, 129); // Emerald-500
-    doc.text('ESG INTELLIGENCE REPORT', 20, 20);
-    
-    doc.setFontSize(12);
-    doc.setTextColor(100, 116, 139); // Slate-500
-    doc.text(`Company: ${company}`, 20, 30);
-    doc.text(`Date: ${date}`, 20, 37);
-    
-    doc.setDrawColor(226, 232, 240); // Slate-200
-    doc.line(20, 45, 190, 45);
-
-    // Metrics Section
-    doc.setFontSize(14);
-    doc.setTextColor(30, 41, 59); // Slate-800
-    doc.text('KEY PERFORMANCE INDICATORS', 20, 55);
-    
-    doc.setFontSize(10);
-    const metricsData = [
-      ['Metric', 'Value'],
-      ['ESG Overall Score', `${metrics.esgScore}/100`],
-      ['Bursa Compliance', `${metrics.bursaCompliance}%`],
-      ['Carbon Footprint', `${metrics.carbonFootprint.toFixed(2)} tCO2e`],
-      ['Waste Recycled', `${formData.recycled} kg`],
-      ['Leadership Diversity', `${formData.women}%`],
-    ];
-
-    let y = 65;
-    metricsData.forEach(([label, value]) => {
-      doc.setTextColor(100, 116, 139);
-      doc.text(label, 20, y);
-      doc.setTextColor(30, 41, 59);
-      doc.text(value, 80, y);
-      y += 8;
-    });
-
-    doc.line(20, y, 190, y);
-    y += 10;
-
-    // Report Section
-    doc.setFontSize(14);
-    doc.setTextColor(30, 41, 59);
-    doc.text('EXECUTIVE ANALYSIS', 20, y);
-    y += 10;
-
-    doc.setFontSize(10);
-    doc.setTextColor(71, 85, 105); // Slate-600
-    
-    // Split text to fit page width
-    const splitReport = doc.splitTextToSize(report, 170);
-    doc.text(splitReport, 20, y);
-
-    // Save PDF
-    doc.save(`ESG_Report_${company.replace(/\s+/g, '_')}.pdf`);
-  };
-
-  const handleEmail = () => {
-    if (!report || !metrics) return;
-    
-    const subject = encodeURIComponent(`ESG Intelligence Report: ${formData.company || 'Your Company'}`);
-    const body = encodeURIComponent(`
-Hi,
-
-Please find the ESG Intelligence Report for ${formData.company || 'Your Company'}.
-
-ESG Score: ${metrics.esgScore}/100
-Bursa Compliance: ${metrics.bursaCompliance}%
-
-Full Report:
-${report}
-
-Generated by ESG Agent Scan.
-    `.trim());
-
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
@@ -348,9 +275,18 @@ Generated by ESG Agent Scan.
               <div className="text-[9px] uppercase tracking-[2.5px] text-[var(--muted)]">AI Agent · ESG Intelligence</div>
             </div>
           </div>
-          <div className="flex items-center gap-2 border border-[var(--border-bright)] rounded-full px-3 py-1.5 text-[10px] tracking-[1.5px] text-[var(--green)] bg-emerald-500/5">
-            <div className="w-1.5 h-1.5 bg-[var(--green)] rounded-full animate-pulse-slow" />
-            AGENT MODE
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={resetAgent}
+              className="text-[10px] uppercase tracking-widest text-[var(--muted)] hover:text-red-400 transition-colors flex items-center gap-1.5"
+            >
+              <RefreshCw size={12} />
+              Reset Agent
+            </button>
+            <div className="flex items-center gap-2 border border-[var(--border-bright)] rounded-full px-3 py-1.5 text-[10px] tracking-[1.5px] text-[var(--green)] bg-emerald-500/5">
+              <div className="w-1.5 h-1.5 bg-[var(--green)] rounded-full animate-pulse-slow" />
+              AGENT MODE
+            </div>
           </div>
         </div>
       </header>
@@ -358,7 +294,7 @@ Generated by ESG Agent Scan.
       <main className="max-w-[1100px] mx-auto px-5 py-12 relative z-10">
         {/* Hero */}
         <div className="text-center mb-12 animate-fade-up">
-          <div className="text-[9px] uppercase tracking-[3px] text-[var(--green)] mb-4">Build with AI · Gemini Hackathon 2026</div>
+          <div className="text-[9px] uppercase tracking-[3px] text-[var(--green)] mb-4">Build with AI · Google Deepmind Hackathon 2026</div>
           <h1 className="font-sans font-extrabold text-4xl md:text-6xl tracking-tighter leading-[1.05] mb-4">
             Your ESG Agent<br/><span className="font-serif italic text-[var(--green)]">Plans. Acts. Reflects.</span>
           </h1>
@@ -436,7 +372,7 @@ Generated by ESG Agent Scan.
                         <FormField id="f_electricity" label="Monthly Electricity (kWh) - TNB" value={formData.electricity} onChange={handleInputChange} type="number" />
                         <FormField id="f_fuel" label="Monthly Fuel (litres) - Petronas" value={formData.fuel} onChange={handleInputChange} type="number" />
                         <FormField id="f_waste" label="Monthly Waste (kg) - Alam Flora" value={formData.waste} onChange={handleInputChange} type="number" />
-                        <FormField id="f_recycled" label="Waste Recycled (KG) - Alam Flora" value={formData.recycled} onChange={handleInputChange} type="number" />
+                        <FormField id="f_recycled" label="Waste Recycled (KG)" value={formData.recycled} onChange={handleInputChange} type="number" />
                         <FormField id="f_water" label="Water Consumptions (m³) - Air Selangor" value={formData.water} onChange={handleInputChange} type="number" />
                       </div>
                     </div>
@@ -449,10 +385,10 @@ Generated by ESG Agent Scan.
                         <div className="h-px flex-1 bg-[var(--border)]" />
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField id="f_employees" label="Total Employees" value={formData.employees} onChange={handleInputChange} type="number" step="1" />
-                        <FormField id="f_women" label="% Women in Leadership" value={formData.women} onChange={handleInputChange} type="number" />
+                        <FormField id="f_employees" label="Total Employees" value={formData.employees} onChange={handleInputChange} type="number" step="1" min="0" />
+                        <FormField id="f_women" label="% Women in Leadership" value={formData.women} onChange={handleInputChange} type="number" min="0" max="100" />
                         <FormField id="f_training" label="Average Training Hours" value={formData.training} onChange={handleInputChange} type="number" step="any" />
-                        <FormField id="f_suppliers" label="% Budget Spent on Local Suppliers" value={formData.suppliers} onChange={handleInputChange} type="number" />
+                        <FormField id="f_suppliers" label="% Budget Spent on Local Suppliers" value={formData.suppliers} onChange={handleInputChange} type="number" min="0" max="100" />
                       </div>
                     </div>
 
@@ -543,30 +479,14 @@ Generated by ESG Agent Scan.
                       {/* Metrics Grid */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <MetricCard label="Carbon Footprint" value={metrics.carbonFootprint.toFixed(2)} unit="tonnes CO2e" progress={Math.min(100, metrics.carbonFootprint * 5)} />
-                        <MetricCard label="Waste Diversion" value={formData.recycled + ' kg'} unit="recycled" progress={Math.min(100, (parseFloat(formData.recycled) / (parseFloat(formData.waste) || 1)) * 100)} />
+                        <MetricCard label="Waste Diversion" value={formData.recycled + '%'} unit="recycled" progress={parseFloat(formData.recycled) || 0} />
                         <MetricCard label="Diversity" value={formData.women + '%'} unit="leadership" progress={parseFloat(formData.women) || 0} />
                       </div>
 
                       {/* AI Report */}
                       <div className="bg-black/20 border border-[var(--border)] rounded-2xl p-6">
-                        <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2 mb-4">
                           <span className="bg-emerald-500/10 border border-[var(--border-bright)] text-[var(--green)] text-[8px] uppercase tracking-widest px-2 py-1 rounded">✨ Agent Intelligence Report</span>
-                          <div className="flex gap-2">
-                            <button 
-                              onClick={handleDownload}
-                              className="p-1.5 rounded-lg bg-black/40 border border-[var(--border)] text-[var(--muted)] hover:text-[var(--green)] hover:border-[var(--green)] transition-all"
-                              title="Download Report"
-                            >
-                              <Download size={14} />
-                            </button>
-                            <button 
-                              onClick={handleEmail}
-                              className="p-1.5 rounded-lg bg-black/40 border border-[var(--border)] text-[var(--muted)] hover:text-[var(--green)] hover:border-[var(--green)] transition-all"
-                              title="Email Report"
-                            >
-                              <Mail size={14} />
-                            </button>
-                          </div>
                         </div>
                         <div className="text-xs leading-relaxed text-[var(--muted)] whitespace-pre-wrap">
                           {report}
@@ -657,7 +577,7 @@ Generated by ESG Agent Scan.
       </main>
 
       <footer className="text-center py-12 text-[9px] text-[var(--dimmer)] uppercase tracking-[1.5px] border-t border-[var(--border)] mt-12">
-        ESGenie Agent · Build with AI: Gemini Hackathon 2026 · Kuala Lumpur
+        ESGenie Agent · Build with AI: Google Deepmind Hackathon 2026 · Kuala Lumpur
       </footer>
     </div>
   );
@@ -682,7 +602,7 @@ function TabButton({ active, onClick, label, icon }: { active: boolean, onClick:
   );
 }
 
-function FormField({ id, label, value, onChange, placeholder, type = "text", step }: { id: string, label: string, value: string, onChange: any, placeholder?: string, type?: string, step?: string }) {
+function FormField({ id, label, value, onChange, placeholder, type = "text", step, min, max }: { id: string, label: string, value: string, onChange: any, placeholder?: string, type?: string, step?: string, min?: string, max?: string }) {
   return (
     <div className="space-y-2">
       <label className="text-[9px] uppercase tracking-widest text-[var(--muted)]">{label}</label>
@@ -693,6 +613,8 @@ function FormField({ id, label, value, onChange, placeholder, type = "text", ste
         onChange={onChange}
         placeholder={placeholder}
         step={step}
+        min={min}
+        max={max}
         className="w-full bg-black/30 border border-[var(--border)] rounded-lg p-2.5 text-xs outline-none focus:border-[var(--green)] transition-all placeholder:text-[var(--dimmer)]"
       />
     </div>

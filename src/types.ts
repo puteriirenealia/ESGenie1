@@ -3,7 +3,7 @@ export interface BillData {
   fuel_litres: number | null;
   water_m3: number | null;
   waste_kg: number | null;
-  recycled_pct: number | null;
+  recycled_kg: number | null;
   num_employees: number | null;
   company_name: string | null;
   bill_month: string | null;
